@@ -39,6 +39,7 @@ def top_features_by_kind(pipeline, k=[50, 50, 50, 0, 0]):
         top_terms_index = np.flipud(np.argsort(term_coeffs)[-k[0]:])
         top_terms = [term_features[j] for j in top_terms_index]
     else:
+        last_term_index = 0
         top_terms = None
 
     if k[1] > 0:
@@ -47,6 +48,7 @@ def top_features_by_kind(pipeline, k=[50, 50, 50, 0, 0]):
         top_hashtags_index = np.flipud(np.argsort(hashtag_coeffs)[-k[1]:])
         top_hashtags = [hashtag_features[j] for j in top_hashtags_index]  
     else:
+        last_hashtag_index = max(0, last_term_index)
         top_hashtags = None
     
     if k[2] > 0:
@@ -55,6 +57,7 @@ def top_features_by_kind(pipeline, k=[50, 50, 50, 0, 0]):
         top_users_index = np.flipud(np.argsort(user_coeffs)[-k[2]:])
         top_users = [user_features[j] for j in top_users_index]
     else:
+        last_user_index = max(0, last_hashtag_index)
         top_users = None
     
     if k[3] > 0:
@@ -63,6 +66,7 @@ def top_features_by_kind(pipeline, k=[50, 50, 50, 0, 0]):
         top_locs_index = np.flipud(np.argsort(location_coeffs)[-k[3]:])
         top_locs = [location_features[j] for j in top_locs_index]
     else:
+        last_location_index = max(0, last_user_index)        
         top_locs = None        
     
     if k[4] > 0:
@@ -71,6 +75,7 @@ def top_features_by_kind(pipeline, k=[50, 50, 50, 0, 0]):
         top_mentions_index = np.flipud(np.argsort(mention_coeffs)[-k[4]:])
         top_mentions = [mention_features[j] for j in top_mentions_index]
     else:
+        last_hashtag_index = max(0, last_location_index)        
         top_mentions = None       
 
     return top_terms, top_hashtags, top_users, top_locs, top_mentions
