@@ -51,4 +51,4 @@ class ItemSelector(TransformerMixin):
         return self.key
 
     def transform(self, data_dict):
-        return data_dict[self.key]
+        return data_dict[self.key].values.astype('str')

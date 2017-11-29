@@ -1,8 +1,9 @@
 import numpy as np
+import pandas as pd
 
 def get_pipeline_features(pipeline):
     term_transformer = pipeline.named_steps['features'].transformer_list[0][1]
-    term_features = term_transformer.named_steps['tfidf'].get_feature_names()
+    term_features = term_transformer.named_steps['count'].get_feature_names()
     
     hashtag_transformer = pipeline.named_steps['features'].transformer_list[1][1]
     hashtag_features = hashtag_transformer.named_steps['count'].get_feature_names()
@@ -17,6 +18,68 @@ def get_pipeline_features(pipeline):
     mention_features = mention_transformer.named_steps['count'].get_feature_names()
     
     return term_features, hashtag_features, user_features, location_features, mention_features
+
+def get_empty_feature_indexes(pipeline):
+    term_features, hashtag_features, user_features, location_features, mention_features = \
+                        get_pipeline_features(pipeline)   
+        
+    prev_length = len(term_features) + len(hashtag_features) + len(user_features)
+    empty_location_index = prev_length + location_features.index("empty_location")
+    empty_mention_index = prev_length + len(location_features) + mention_features.index("empty_mention")
+    
+    return empty_location_index, empty_mention_index
+
+def get_feature_by_index(pipeline, indexes, pos_coverages=None, neg_coverages=None, mutual_info_scores=None):
+    term_features, hashtag_features, user_features, location_features, mention_features = \
+                        get_pipeline_features(pipeline)
+    
+    term_last_index = len(term_features)
+    hash_last_index = term_last_index + len(hashtag_features)
+    user_last_index = hash_last_index + len(user_features)
+    loc_last_index = user_last_index + len(location_features)
+    
+    features_df = pd.DataFrame()
+    for i in range(len(indexes)):
+        if indexes[i] < term_last_index:
+            feature = term_features[indexes[i]]
+            features_df = features_df.append([[feature, "Term"]])
+        elif indexes[i] < hash_last_index:
+            feature = hashtag_features[indexes[i] - term_last_index]
+            features_df = features_df.append([[feature, "Hashtag"]])
+        elif indexes[i] < user_last_index:
+            feature = user_features[indexes[i] - hash_last_index]
+            features_df = features_df.append([[feature, "User"]])
+        elif indexes[i] < loc_last_index:
+            feature = location_features[indexes[i] - user_last_index]
+            features_df = features_df.append([[feature, "Location"]])
+        else:
+            feature = mention_features[indexes[i] - loc_last_index]
+            features_df = features_df.append([[feature, "Mention"]])
+    
+    features_df = features_df.reset_index(drop=True)
+    
+    
+    if pos_coverages == None:
+        features_df.columns = ["Feature", "Type"]
+    else:
+        selected_coverages = [len(pos_coverages[i]) for i in indexes]
+        
+        features_df = pd.concat([features_df, pd.DataFrame(selected_coverages)], axis=1)
+        features_df.columns = ["Feature", "Type", "Positive Coverage"]
+        
+    if neg_coverages != None:
+        selected_coverages = [len(neg_coverages[i]) for i in indexes]
+        
+        features_df = pd.concat([features_df, pd.DataFrame(selected_coverages)], axis=1)
+        features_df = features_df.rename(columns = {0: "Negative Coverage"})
+        
+    if mutual_info_scores != None:
+        selected_mis = [mutual_info_scores[i] for i in indexes]
+        
+        features_df = pd.concat([features_df, pd.DataFrame(selected_mis)], axis=1)
+        features_df = features_df.rename(columns = {0: "MI Score"})
+        
+    return features_df
 
 def topk_features(pipeline, k=50):
     clf = pipeline.named_steps['classifier']
