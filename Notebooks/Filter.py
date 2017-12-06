@@ -4,6 +4,7 @@ import re
 
 def filter_data(data, terms=[], hashtags=None, users=None, locs=None, mentions=None):
     filtered_data = pd.DataFrame()
+
     if len(terms) > 0:
         terms_filter = [re.sub(r'(.*)', r'\\b\1\\b', term) for term in terms]
         terms_regex = '|'.join(terms_filter)
@@ -26,7 +27,7 @@ def filter_data(data, terms=[], hashtags=None, users=None, locs=None, mentions=N
         locs_regex = '|'.join(locs_filter)
         locs_filtered = data.loc[data['location'].str.lower().str.contains(locs_regex)]
         filtered_data = pd.concat([filtered_data, locs_filtered])
-
+        
     if mentions != None and len(mentions) > 0:
         mentions_filter = [re.sub(r'(.*)', r'\\b\1\\b', mention) for mention in mentions]
         mentions_regex = '|'.join(mentions_filter)
