@@ -1,5 +1,7 @@
 from gurobipy import *
 import time 
+from sklearn.preprocessing import binarize
+
 
 def max_cover(feature_coverage, num_tweets, k=20):
     # feature_coverage: tweets covered by each feature
@@ -208,4 +210,37 @@ def max_cover_with_negs_unweighted(positive_coverage, negative_coverage, num_pos
             
     return selected_features_index
 
+def greedy_max_cover(positive_set, negative_set, pipeline, k=20, print_solve_time=False):
+    num_positive_tweets = positive_set.shape[0]
+    num_negative_tweets = negative_set.shape[0]
+    num_features = positive_set.shape[1]
+      
+    positive_bin = binarize(positive_set)
+    negative_bin = binarize(negative_set)
 
+    positive_lil = positive_bin.tolil()
+    negative_lil = negative_bin.tolil()
+    
+    if print_solve_time == True:
+        start_time = time.time()
+
+    selected_features = []
+
+    for i in range(k):
+        max_score = -99999
+        selected_feature = -1
+
+        scores = positive_lil.sum(axis=0) - negative_lil.sum(axis=0)
+        selected_feature = scores.argmax()
+
+        if selected_feature not in selected_features:
+            selected_features.append(selected_feature)
+            positive_lil[:, selected_feature] = 0
+            negative_lil[:, selected_feature] = 0
+        else:
+            break
+    
+    if print_solve_time == True:
+        print("Running Time: {0} Seconds".format(time.time() - start_time))
+    
+    return selected_features

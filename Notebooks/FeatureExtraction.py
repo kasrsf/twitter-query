@@ -19,6 +19,20 @@ def get_pipeline_features(pipeline):
     
     return term_features, hashtag_features, user_features, location_features, mention_features
 
+def get_feature_index(features, pipeline):
+    term_features, hashtag_features, user_features, location_features, mention_features = \
+                       get_pipeline_features(pipeline)   
+        
+    all_features = [term_features, hashtag_features, user_features, location_features, mention_features]
+    all_features = [feature for features_list in all_features for feature in features_list]        
+    
+    indexes = []
+    for feature in features:
+        if feature in all_features:
+            indexes.append(all_features.index(feature))
+       
+    return indexes   
+
 def get_empty_feature_indexes(pipeline):
     term_features, hashtag_features, user_features, location_features, mention_features = \
                         get_pipeline_features(pipeline)   

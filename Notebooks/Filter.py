@@ -34,4 +34,4 @@ def filter_data(data, terms=[], hashtags=None, users=None, locs=None, mentions=N
         mentions_filtered = data.loc[data['mention'].str.lower().str.contains(mentions_regex)]
         filtered_data = pd.concat([filtered_data, mentions_filtered])
 
-    return filtered_data.drop_duplicates()
+    return filtered_data.drop_duplicates(subset='tweet_id')
