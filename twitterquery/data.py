@@ -36,6 +36,13 @@ def labeled_data_column_subset(labeled_data):
                                col('label'))
 
 def load_labeled_data(spark_session, data, topic):
+    # Tokenizer converts input to lowercase and then splits by white space
+    hashtag_tokenizer = Tokenizer(inputCol='hashtag', outputCol='hashtags')
+    hashtag_occurances = (hashtag_tokenizer
+                                .transform(data) 
+                                .select('tweet_id', 'hashtags')
+                                .withColumn('hashtags', explode('hashtags')))
+
     labeled_dir = settings.LABELED_DATA_PARENT_DIR + topic
     pos_dir = labeled_dir + '/pos'
     topical_tweet_ids = spark_session.read.parquet(pos_dir)
@@ -55,9 +62,9 @@ def load_labeled_data(spark_session, data, topic):
 
     labeled_data = topical_tweets.union(non_topical_tweets)
                                  
-    return labeled_data#)
+    return labeled_data
 
-def get_labeled_data(data, topic):
+def get_labeled_data(data, topic, frac=None):
     # Tokenizer converts input to lowercase and then splits by white space
     hashtag_tokenizer = Tokenizer(inputCol='hashtag', outputCol='hashtags')
     hashtag_occurances = (hashtag_tokenizer
@@ -78,7 +85,15 @@ def get_labeled_data(data, topic):
                             on=data.tweet_id == labeled_topical['topical_id'], 
                             how="left")
                     .withColumn('label', F.when(labeled_topical.topical == 1, 1).otherwise(0)))
-    
+
+    if frac != None:
+        pos_lab = labeled_data.where(labeled_data.label == 1)
+        neg_lab = labeled_data.where(labeled_data.label == 0)
+        neg_lab_sampled = neg_lab.sample(withReplacement=False, 
+                                         fraction=frac, 
+                                         seed=settings.RANDOM_SEED)
+        labeled_data = pos_lab.unionAll(neg_lab_sampled)
+
     return labeled_data_column_subset(labeled_data)
 
 def get_num_of_positive_labels(labeled_data):
@@ -89,7 +104,7 @@ def split_kfold(labeled_data, k=5, random_seed=settings.RANDOM_SEED):
     return labeled_data.randomSplit(split_size, seed=random_seed)
 
 def load_splitted_data(topic, 
-                        num_of_splits=10,
+                        num_of_splits=5,
                         stored_splits_dir=settings.SPLITTED_DATA_PARENT_DIR,
                         shuffle=False,
                         random_seed=settings.RANDOM_SEED):
@@ -101,9 +116,10 @@ def load_splitted_data(topic,
             merged_data = splitted_df
         else:            
             merged_data = pd.concat([merged_data, splitted_df])
+
     if shuffle is True:
         merged_data = merged_data.sample(frac=1, random_state=random_seed) \
-                        .reset_index()
+                        .reset_index(drop=True)
 
     return merged_data
 
@@ -120,13 +136,13 @@ def merge_splits_into_train_test(data_splits, test_split_index):
                 train = pd.concat([train, data_splits[i]])
     return train, test
 
-def get_transformed_data(topic, cached_labeled=None, shuffle=True):
+def get_transformed_data(topic, cached_labeled=None, num_of_splits=5, shuffle=True):
     if cached_labeled is None:
-        labeled_data = load_splitted_data(topic, shuffle=shuffle)
+        labeled_data = load_splitted_data(topic, num_of_splits=num_of_splits, shuffle=shuffle)
     else:
-        labeled_data = cached_labeled#.iloc[:10000]
-    labeled_data_features = labeled_data.drop('label', axis=1)
-    label_data = labeled_data.label
+        labeled_data = cached_labeled
+    labeled_data_features = labeled_data.drop(['create_time', 'label'], axis=1)
+    label_data = labeled_data.loc[:, ['create_time', 'label']]
     transformer = transformers.DataframeTransformer(labeling_tags=utils.get_labeling_tags_for_topic(topic))
     transformed_data = transformer.fit_transform(labeled_data_features)
     return (transformed_data, label_data, transformer)
@@ -136,14 +152,27 @@ def filter_matrix_by_index(feature_matrix, labels, filtering_indices):
     for feature in filtering_indices:
         filtered_rows = filtered_rows.union(set(feature_matrix[:, feature].nonzero()[0]))
     filtered_rows = list(filtered_rows)
-    return feature_matrix[filtered_rows, :], labels.loc[filtered_rows]
+    return feature_matrix[filtered_rows, :], labels.loc[filtered_rows, :]
 
 def get_mi_scores(data_features, data_labels):
     sampled_data, sampled_labels = utils.sample_sparse_matrix(data_features, data_labels)
     num_features = sampled_data.shape[1]
     mutual_info_scores = []
+    print("number of features = {}".format(num_features))
     for i in range(num_features):
         cov = sampled_data[:, i].toarray().flatten()
-        feat_mi_score = normalized_mutual_info_score(sampled_labels, cov)
-        mutual_info_scores.append(feat_mi_score)
+        if (sum(cov) < 50):
+            mutual_info_scores.append(0)
+        else:
+            feat_mi_score = normalized_mutual_info_score(sampled_labels, cov)
+            mutual_info_scores.append(feat_mi_score)
     return mutual_info_scores
+
+def count_most_recent_topcial_in_n(labeled_data, n):
+    """
+    Parameters
+    -----------
+    labeled_data: dataframe with columns ['create_time', 'label]
+    n: number of tweets returned 
+    """
+    return sum(labeled_data.sort_values(by='create_time', ascending=False).iloc[:n, 1])

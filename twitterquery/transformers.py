@@ -29,22 +29,22 @@ class DataframeTransformer:
             transformer_list=[
                 ('term', Pipeline([
                     ('selector', ItemSelector(key='term')),
-                    ('count', CountVectorizer())])),
+                    ('count', CountVectorizer(min_df=100))])),
                 ('hashtag', Pipeline([
                     ('selector', ItemSelector(key='hashtags')),
-                    ('count', CountVectorizer(stop_words=self.labeling_tags, ))])),
-                ('user', Pipeline([
-                    ('selector', ItemSelector(key='from_user')),
-                    ('count', CountVectorizer())])),
+                    ('count', CountVectorizer(stop_words=self.labeling_tags, min_df=100))])),
+                # ('user', Pipeline([
+                #     ('selector', ItemSelector(key='from_user')),
+                #     ('count', CountVectorizer())])),
                 ('location', Pipeline([
                     ('selector', ItemSelector(key='location')),
-                    ('count', CountVectorizer(stop_words=['empty_location'], ))])),
+                    ('count', CountVectorizer(stop_words=['empty_location'], min_df=100))])),
                 ('mention', Pipeline([
                     ('selector', ItemSelector(key='mention')),
-                    ('count', CountVectorizer(stop_words=['empty_mention'], ))]))])
+                    ('count', CountVectorizer(stop_words=['empty_mention'], min_df=100))]))])
 
     def fit(self, data):        
-        self.feature_transformer.fit(data)
+        self.feature_transformer = self.feature_transformer.fit(data)
     
     def fit_transform(self, data):
         return self.feature_transformer.fit_transform(data)
@@ -61,19 +61,19 @@ class DataframeTransformer:
         hashtags = hashtag_transformer.named_steps['count'].get_feature_names()
         hashtags_df = utils.get_features_pd_from_list(hashtags, 'hashtag')
         
-        user_transformer = self.feature_transformer.transformer_list[2][1]
-        users = user_transformer.named_steps['count'].get_feature_names()
-        users_df = utils.get_features_pd_from_list(users, 'user')
+        # user_transformer = self.feature_transformer.transformer_list[2][1]
+        # users = user_transformer.named_steps['count'].get_feature_names()
+        # users_df = utils.get_features_pd_from_list(users, 'user')
         
-        location_transformer = self.feature_transformer.transformer_list[3][1]
+        location_transformer = self.feature_transformer.transformer_list[2][1]
         locations = location_transformer.named_steps['count'].get_feature_names()
         locations_df = utils.get_features_pd_from_list(locations, 'location')
         
-        mention_transformer = self.feature_transformer.transformer_list[4][1]
+        mention_transformer = self.feature_transformer.transformer_list[3][1]
         mentions = mention_transformer.named_steps['count'].get_feature_names()
         mentions_df = utils.get_features_pd_from_list(mentions, 'mention')
 
-        features_df = pd.concat([terms_df, hashtags_df, users_df, locations_df, mentions_df]) \
+        features_df = pd.concat([terms_df, hashtags_df, locations_df, mentions_df]) \
                         .reset_index(drop=True)
         return features_df
 
@@ -84,12 +84,13 @@ class DataframeTransformer:
 def train_test_split(occurance_matrix,
                      labels,
                      test_split_index,
-                     num_of_splits=5):
+                     num_of_splits=5,
+                     include_timestamp=False):
     split_size = occurance_matrix.shape[0] / num_of_splits
     train_features = None
     for i in range(num_of_splits):
         split_data = occurance_matrix[i * split_size:(i + 1) * split_size]
-        split_labels = labels[i * split_size:(i + 1) * split_size]
+        split_labels = labels.iloc[i * split_size:(i + 1) * split_size, :]
         if i == test_split_index:
             test_features = split_data
             test_labels = split_labels.reset_index(drop=True)
@@ -100,8 +101,13 @@ def train_test_split(occurance_matrix,
             else:
                 train_features = vstack([train_features, split_data])
                 train_labels = train_labels.append(split_labels)
-    return (train_features, train_labels.reset_index(drop=True),
-             test_features, test_labels)
+
+    if include_timestamp == False:
+        train_labels = train_labels.label
+        test_labels = test_labels.label
+
+    return (train_features, train_labels.reset_index(drop=True), test_features, test_labels)
+
 
 def get_positive_negative_set(occurance_matrix, labels, pos_count=None, neg_to_pos_ratio=1):
     random.seed(settings.RANDOM_SEED)

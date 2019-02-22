@@ -5,8 +5,6 @@ import time
 import matplotlib.pyplot as plt
 import matplotlib as mplt
 import numpy as np
-from sklearn.linear_model import SGDClassifier
-from sklearn.metrics import average_precision_score
 import scipy.stats as st
 
 import classification
@@ -47,31 +45,6 @@ def delete_row_lil(mat, i):
     mat.rows = np.delete(mat.rows, i)
     mat.data = np.delete(mat.data, i)
     mat._shape = (mat._shape[0] - len(i), mat._shape[1])
-
-def run_experiment(train_data, train_target, 
-                    test_data, test_target,
-                    filtering_feature_index):
-    # 1nd stage: filtering
-    print("begin filtering")
-    start_time = time.time()
-    filtered_train_data, filtered_train_labels = data.filter_matrix_by_index(train_data,
-                                                                            train_target,
-                                                                            filtering_feature_index)        
-    print("filtering done in {:.2f}s".format(time.time() - start_time))
-    phase1_stats = utils.get_labeled_data_statistics(filtered_train_labels)
-    # 2nd stage: training
-    print("training classifier")
-    start_time = time.time()
-    classifier = SGDClassifier(loss='log', class_weight='balanced', penalty='elasticnet')
-    classifier.fit(filtered_train_data, filtered_train_labels)        
-    preds_proba = classifier.predict_proba(train_data)[:, 1]
-    train_avep = average_precision_score(train_target, preds_proba)
-    preds_proba = classifier.predict_proba(test_data)[:, 1]
-    test_avep = average_precision_score(test_target, preds_proba)
-    test_patk = classification.p_at_k_score(test_target, preds_proba, k=100)
-    test_ratk = classification.r_at_k_score(test_target, preds_proba, k=100)
-    print("classifier done in {:.2f} seconds".format(time.time() - start_time))
-    return phase1_stats, train_avep, test_avep, test_patk
 
 def sample_sparse_matrix(matrix, labels=None, n=5000):
     if labels is None:
@@ -233,4 +206,30 @@ def plot_phase1_stats(topic):
 
     # #plt.legend([bar1[0], bar1[1]], ['test', 't'])
     plt.tight_layout()
+    plt.show()
+
+def plot_ratk_recalls(results_dict, topic, k=18000):
+    start = 0.0
+    stop = 1.0
+    number_of_lines= len(results_dict)
+    cm_subsection = np.linspace(start, stop, number_of_lines) 
+    colors = [ mplt.cm.Dark2(x) for x in cm_subsection ]    
+
+    fig = plt.figure()
+    x_pos = np.arange(number_of_lines)
+    ys, errs = [list(tup) for tup in zip(*results_dict.values())]
+    plt.bar(x_pos, ys, yerr=errs, 
+            align='center',
+            width=0.5,
+            alpha=0.75,
+            color=colors,
+            edgecolor="black",
+            ecolor='black',
+        label=results_dict.keys())
+
+
+    plt.xticks(x_pos, results_dict.keys())
+    #plt.ylim(0, 1)
+    plt.ylabel("Recall@K")
+    plt.title("Recall@K for K=18,000, Topic={}".format(utils.get_readable_topic(topic)))
     plt.show()

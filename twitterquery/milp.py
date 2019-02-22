@@ -48,7 +48,7 @@ def greedy_cilp(positive_set, k=20):
             break
     return selected_features
     
-def gurobi_wilp(tweet_feature_matrix, mutual_info_scores, mi_weight=1, k=20):
+def gurobi_wilp(tweet_feature_matrix, mutual_info_scores, mi_weight=1000, k=20):
     num_tweets, num_features = tweet_feature_matrix.shape
     m = gurobi.Model()
     m.setParam('OutputFlag', False )
@@ -98,7 +98,7 @@ def gurobi_cailp(positive_coverage, negative_coverage, k=20):
     if num_positive_tweets > 1000:
         positive_coverage, _ = utils.sample_sparse_matrix(positive_coverage, n=1000)
         num_positive_tweets = positive_coverage.shape[0]
-    negative_coverage, _ = utils.sample_sparse_matrix(negative_coverage, n=num_positive_tweets)
+    negative_coverage, _ = utils.sample_sparse_matrix(negative_coverage, n=int(num_positive_tweets))
     num_negative_tweets = negative_coverage.shape[0]
 
     m = gurobi.Model()
