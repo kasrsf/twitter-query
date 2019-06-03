@@ -153,9 +153,17 @@ def feats_intersect(features):
                                        on=['Feature', 'Type'])
     return common_feats_df
 
+def get_most_frequent_features_in_splits(selected_features_per_split):
+    selected_features_flat = pd.concat(selected_features_per_split).reset_index(drop=True)
+    feature_occurances_series = selected_features_flat.groupby(['Feature', 'Type']).size()
+    feature_occurances_df = feature_occurances_series.to_frame('frequency').reset_index()
+    feature_occurances_sorted = feature_occurances_df.sort_values(by=['frequency'], ascending=False).reset_index(drop=True)
+    
+    return feature_occurances_sorted
+
 def summarise_feats(topic, method, k=5):
     feats = load_results_features(topic, method, k)
-    return feats_intersect(feats)
+    return get_most_frequent_features_in_splits(feats)
 
 def plot_phase1_stats(topic):
     methods = utils.get_stat_methods()
@@ -225,11 +233,11 @@ def plot_ratk_recalls(results_dict, topic, k=18000):
             color=colors,
             edgecolor="black",
             ecolor='black',
-        label=results_dict.keys())
+        label=['CILP', 'WILP', 'CAILP', 'Firehose', 'TopK'])
 
 
-    plt.xticks(x_pos, results_dict.keys())
+    plt.xticks(x_pos, ['CILP', 'WILP', 'CAILP', 'Firehose', 'TopK'])
     #plt.ylim(0, 1)
-    plt.ylabel("Recall@K")
-    plt.title("Recall@K for K=18,000, Topic={}".format(utils.get_readable_topic(topic)))
+    plt.ylabel("R@18,000")
+    plt.title("{}".format(utils.get_readable_topic(topic)))
     plt.show()
